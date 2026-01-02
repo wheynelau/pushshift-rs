@@ -494,12 +494,12 @@ mod tests {
         let result = construct_filename(
             "{basename}_{subreddit}",
             "submission-R_2025-09",
-            Some("singaporefi"),
+            Some("foo"),
             100,
             "zst",
             true,
         );
-        assert_eq!(result, "submission-R_2025-09_singaporefi.zst");
+        assert_eq!(result, "submission-R_2025-09_foo.zst");
     }
 
     #[test]
@@ -508,12 +508,12 @@ mod tests {
         let result = construct_filename(
             "outputs/{basename}_{subreddit}.jsonl",
             "submission-R_2025-09",
-            Some("singaporefi"),
+            Some("foo"),
             100,
             "jsonl",
             false,
         );
-        assert_eq!(result, "outputs/submission-R_2025-09_singaporefi.jsonl");
+        assert_eq!(result, "outputs/submission-R_2025-09_foo.jsonl");
     }
 
     #[test]
