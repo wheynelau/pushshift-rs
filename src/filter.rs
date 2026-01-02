@@ -329,7 +329,7 @@ fn setup_file_writers<P: AsRef<std::path::Path>>(
                     &ext,
                     append_ext,
                 );
-                let writer = common::setup_writer(filename);
+                let writer = common::setup_writer(filename, args.compression.level);
                 (name.clone(), writer)
             })
             .collect();

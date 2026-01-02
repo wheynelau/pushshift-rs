@@ -35,7 +35,7 @@ impl JsonlWriter {
     }
 }
 
-pub fn setup_writer<P: AsRef<Path>>(filename: P) -> Box<dyn Write> {
+pub fn setup_writer<P: AsRef<Path>>(filename: P, level: i32) -> Box<dyn Write> {
     let path = filename.as_ref();
     let outfile = File::create(path).expect("Failed to create output file");
     let writer: Box<dyn Write> = if path
@@ -43,8 +43,8 @@ pub fn setup_writer<P: AsRef<Path>>(filename: P) -> Box<dyn Write> {
         .is_some_and(|ext| ext.eq_ignore_ascii_case("zst"))
     {
         // Use zstd encoder for .zst files
-        let encoder =
-            zstd::stream::write::Encoder::new(outfile, 0).expect("Failed to create zstd encoder");
+        let encoder = zstd::stream::write::Encoder::new(outfile, level)
+            .expect("Failed to create zstd encoder");
         Box::new(BufWriter::new(encoder))
     } else {
         // Write directly for other files (e.g., .jsonl)

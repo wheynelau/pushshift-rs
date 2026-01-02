@@ -49,7 +49,7 @@ pub fn run_process(args: ProcessArgs) -> Result<()> {
             .lines()
             .map_while(Result::ok)
             .filter_map(|line| serde_json::from_str::<Comment>(&line).ok())
-            .filter_map(|json| TryInto::<Reddit>::try_into(json).ok())
+            .filter_map(|json| json.into_reddit(args.include_scores).ok())
             .for_each(|comment| {
                 if let Some(parent_id) = &comment.parent_id
                     && thread_graph.is_in_map(parent_id)
@@ -63,6 +63,6 @@ pub fn run_process(args: ProcessArgs) -> Result<()> {
     });
     pb.finish_with_message(format!("Completed {submission_count} comments file"));
 
-    thread_graph.tranverse(threads, args.output)?;
+    thread_graph.tranverse(threads, args.output, args.compression.level)?;
     Ok(())
 }

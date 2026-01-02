@@ -42,8 +42,13 @@ impl ThreadGraph {
         self.graph.add_edge(from_idx, to_idx, ());
     }
 
-    pub fn tranverse(&self, mut vec_threads: Vec<Reddit>, output: PathBuf) -> Result<()> {
-        let mut writer = setup_writer(output);
+    pub fn tranverse(
+        &self,
+        mut vec_threads: Vec<Reddit>,
+        output: PathBuf,
+        level: i32,
+    ) -> Result<()> {
+        let mut writer = setup_writer(output, level);
 
         let pb = ProgressBar::new(self.graph.node_indices().len() as u64);
         pb.set_style(

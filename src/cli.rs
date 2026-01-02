@@ -15,11 +15,24 @@ pub enum Commands {
     /// Filter Reddit data based on criteria
     Filter(FilterArgs),
 }
-
+/// BFS is not implemented yet
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum SearchMethod {
     BFS,
     DFS,
+}
+
+#[derive(Args, Clone)]
+pub struct CompressionArgs {
+    /// Compression level
+    #[arg(
+        short,
+        long,
+        help = "Compression level from 0-22, ignored if extension is not .zst",
+        default_value = "3",
+        value_parser = clap::value_parser!(i32).range(0..23)
+    )]
+    pub level: i32,
 }
 
 #[derive(Args, Clone)]
@@ -33,6 +46,13 @@ pub struct ProcessArgs {
 
     #[arg(short, long)]
     pub output: std::path::PathBuf,
+
+    /// Include score information in comment text
+    #[arg(long, default_value = "false", action = clap::ArgAction::SetTrue)]
+    pub include_scores: bool,
+
+    #[command(flatten)]
+    pub compression: CompressionArgs,
 }
 
 #[derive(Args, Clone)]
@@ -42,14 +62,13 @@ pub struct FilterArgs {
     pub input: Vec<std::path::PathBuf>,
 
     /// Output file template for filtered results
-    /// Available placeholders: {basename} (input filename without extension),
-    /// {subreddit} (required when using --split), {timestamp} (Unix timestamp)
-    /// Examples:
-    ///   filtered_{subreddit}.jsonl           → `filtered_singapore.jsonl`
-    ///   outputs/{basename}_{subreddit}.jsonl → outputs/RC_2025-09_singapore.jsonl
-    ///   data/{basename}_{timestamp}.jsonl    → data/RC_2025-09_1735830645.jsonl
-    ///   data/{basename}_{timestamp}.zst -> data/RC_2025-09_1735830645.zst
-    #[arg(short, long)]
+    /// Available placeholders: {basename} {subreddit} {timestamp}
+    /// Extension is provided by user: only accepts .zst and .jsonl
+    #[arg(
+        short,
+        long,
+        help = "Output file template (e.g., {basename}_{subreddit}_filtered.jsonl)"
+    )]
     pub output: Option<std::path::PathBuf>,
 
     /// Split into multiple files by subreddits
@@ -64,28 +83,23 @@ pub struct FilterArgs {
     #[arg(
         short,
         long,
-        help = "To filter multiple subreddits use -n subreddit 1 -n subreddit 2",
+        help = "To filter multiple subreddits use -n subreddit 1 -n subreddit 2. Note that no check is done to ensure the subreddit exists.",
         value_parser = parse_lowercase,
-        num_args = 0..
+        num_args = 1..,
+        required(true)
     )]
     pub name: Vec<String>,
 
-    /// Compression level
-    #[arg(
-        short,
-        long,
-        help = "Compression level from 1-19, ignored if extension is not .zst",
-        default_value = "3"
-    )]
-    pub level: u32,
+    #[command(flatten)]
+    pub compression: CompressionArgs,
 
     /// Run in multithreaded mode
     #[arg(short,
         long,
         action=clap::ArgAction::SetTrue,
-        default_value = "false", 
+        default_value = "false",
         help = "Multithreaded may be misleading here, but what it means is a single thread is used for read and decompress, a second thread is for json and writes
-                This can be useful if you have a fast IO.")]
+                This can be useful if you have a fast IO. This is quite experimental.")]
     pub multithread: bool,
 }
 

@@ -21,6 +21,9 @@ pub struct Comment {
     pub name: String,
     pub body: String,
     pub parent_id: String,
+    pub score: u64,
+    pub ups: u64,
+    pub downs: u64,
 }
 
 impl Reddit {
@@ -96,6 +99,31 @@ impl Reddit {
     }
 }
 
+impl Comment {
+    pub fn into_reddit(self, include_scores: bool) -> Result<Reddit, anyhow::Error> {
+        let selftext = self.body;
+
+        if selftext == "[deleted]" || selftext == "[removed]" {
+            bail!("Comment is deleted or removed");
+        }
+
+        let selftext = if include_scores {
+            let score = self.score;
+            let ups = self.ups;
+            let downs = self.downs;
+            format!("{selftext}\n\n{{score: {score} Ups: {ups} Downs: {downs}}}")
+        } else {
+            selftext
+        };
+
+        Ok(Reddit {
+            id: self.name,
+            selftext,
+            parent_id: Some(self.parent_id),
+        })
+    }
+}
+
 impl TryFrom<Comment> for Reddit {
     type Error = anyhow::Error;
     fn try_from(comment: Comment) -> Result<Reddit, Self::Error> {
@@ -104,12 +132,10 @@ impl TryFrom<Comment> for Reddit {
             bail!("Comment is deleted or removed");
         }
 
-        let id = comment.name;
-        let parent_id = comment.parent_id;
         let reddit = Reddit {
-            id,
+            id: comment.name,
             selftext,
-            parent_id: Some(parent_id),
+            parent_id: Some(comment.parent_id),
         };
         Ok(reddit)
     }
