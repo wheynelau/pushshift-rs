@@ -21,10 +21,6 @@ zstd = { version = "0.13.3", features = ["zstdmt"] }
 criterion = { version = "0.8.1", features = ["html_reports"] }
 simd-json = "0.17.0"
 
-[[bench]]
-name = "json_bench"
-harness = false
-
 # The profile that 'dist' will build with
 [profile.dist]
 inherits = "release"
