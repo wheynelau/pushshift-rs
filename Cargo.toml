@@ -1,0 +1,25 @@
+[package]
+name = "reddit-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.100"
+clap = { version = "4.5.53", features = ["derive"] }
+crossbeam-channel = "0.5.15"
+gjson = "0.8.1"
+indicatif = "0.18.3"
+petgraph = { version = "0.8.3", features = ["rayon"] }
+rayon = "1.11.0"
+regex = "1.12.2"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.148"
+zstd = { version = "0.13.3", features = ["zstdmt"] }
+
+[dev-dependencies]
+criterion = { version = "0.8.1", features = ["html_reports"] }
+simd-json = "0.17.0"
+
+[[bench]]
+name = "json_bench"
+harness = false
