@@ -1,5 +1,5 @@
 use anyhow::{Context, Error, Result, bail};
-use crossbeam_channel::{Receiver, Sender, bounded};
+use crossbeam_channel::bounded;
 use gjson;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
@@ -196,61 +196,6 @@ fn process_single_file(input_path: &PathBuf, args: &FilterArgs, mb: MultiProgres
 
     // Propagate the first error encountered, if any
     producer_result.and(consumer_result)
-}
-#[allow(dead_code)]
-fn run_filter_mt_old(args: FilterArgs) -> Result<()> {
-    // On profiling, the decompress is usually longer than the json and writing
-    // So a small bound is fine
-    for input_path in &args.input {
-        let file_name = input_path
-            .file_name()
-            .expect("Failed to get file name")
-            .to_str()
-            .expect("Failed to convert to string");
-
-        let pb = setup_progress_bar(file_name);
-        let (line_sender, line_receiver): (Sender<String>, Receiver<String>) = bounded(1_000);
-
-        // 1. Create a Rayon scope to manage the background task
-        rayon::scope(|s| {
-            // 2. Spawn the decompression task into the Rayon pool
-            // Note: No handle is returned; the scope manages the lifetime.
-            s.spawn(|_| {
-                let reader = common::setup_reader(input_path, &pb);
-                for line in reader.lines() {
-                    if let Ok(l) = line {
-                        if line_sender.send(l).is_err() {
-                            break;
-                        }
-                    } else {
-                        break;
-                    }
-                }
-                // line_sender drops here, closing the channel for the receiver
-            });
-
-            // 3. Setup writers (this runs in the main thread simultaneously)
-            let (mut file_map, mut combined_writer) =
-                setup_file_writers(input_path, &args).expect("Failed to setup writers");
-            let mut filtered_count = 0u64;
-
-            // 4. Process lines as they come in
-            for line in line_receiver {
-                if process_and_write_line(&line, &args, &mut file_map, &mut combined_writer)
-                    .is_ok_and(|b| b)
-                {
-                    filtered_count += 1;
-                    pb.set_message(format!("Filtered: {filtered_count}"));
-                }
-            }
-
-            // 5. Flush writers
-            flush_writers(file_map, combined_writer).expect("Flush error");
-
-            pb.finish_with_message(format!("Filtered: {filtered_count}"));
-        });
-    }
-    Ok(())
 }
 
 fn run_filter_mt(args: &FilterArgs, mb: MultiProgress) -> Result<()> {
