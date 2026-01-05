@@ -44,7 +44,8 @@ pub fn setup_writer<P: AsRef<Path>>(filename: P, level: i32) -> Box<dyn Write> {
     {
         // Use zstd encoder for .zst files
         let encoder = zstd::stream::write::Encoder::new(outfile, level)
-            .expect("Failed to create zstd encoder");
+            .expect("Failed to create zstd encoder")
+            .auto_finish();
         Box::new(BufWriter::new(encoder))
     } else {
         // Write directly for other files (e.g., .jsonl)
