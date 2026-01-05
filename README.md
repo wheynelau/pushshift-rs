@@ -25,19 +25,25 @@ the subreddit must be known at the filtering stage.
 
 ### Performance notes
 
-If an array of files is provided, the filtering is done in parallel using rayon. There is also an experimental flag called `--multithreaded`,
-howver it is meant to split a file into two workers. To reduce resource contention, its better to use the defaults. 
+- If an array of files is provided, the filtering is done in parallel using rayon. There is also an experimental flag called `--multithreaded`,
+however it is meant to split a file into two workers. To reduce resource contention, its better to use the defaults. 
 
 Worker 1: Handles read and decompress
 Worker 2: Json serialization, filtering and writing
 
+- `zstd` supports multithreaded compression, but there are not plans for implementation. 
+
 ### Example
 
 ```bash
-reddit-rs filter -i *.zst -n funny wallstreetbets -o {basename}_filtered.zst -l 3
+reddis-rs filter -i *.zst -n funny wallstreetbets -o {basename}_filtered.zst -l 3
 ```
 
 The above will filter all posts/comments from the subreddit `funny` and `wallstreetbets`, into multiple compressed files, with a compression level of 3.
+
+### Post processing
+
+Because all the filtering does is check for the field `subreddit`, you can technically use it for anything else as long as the field exists. For example you can filter after the process step below, or use it on other datasets with a `subreddit` field.
 
 ## Process
 
@@ -53,7 +59,7 @@ It can be useful if you need the scores information for a downstream task.
 
 ### Example of an output
 
-The output always contains two fields, `raw_content` and `length`. 
+The output always contains three fields, `raw_content`, `subreddit`, and `length`. 
 
 For now the length is just a simple `.len()`, but can be modified to use tokenizers or split by whitespace. 
 
@@ -62,6 +68,7 @@ For now the length is just a simple `.len()`, but can be modified to use tokeniz
 ```json
 {
     "raw_content": "What are you waiting for?\n\n{score: 2 Ups: 2 Downs: 0}\n\nyup!\n\n{score: 3 Ups: 3 Downs: 0}",
+    "subreddit" : "funny",
     "length" : 600
 }
 ```
