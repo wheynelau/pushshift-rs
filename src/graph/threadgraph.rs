@@ -70,6 +70,7 @@ impl ThreadGraph {
             }
 
             if threads.len() > 1 {
+                let subreddit = vec_threads[threads[0]].subreddit.clone();
                 let raw_content = threads
                     .iter_mut()
                     .map(|thread| std::mem::take(&mut vec_threads[*thread].selftext))
@@ -78,14 +79,11 @@ impl ThreadGraph {
                 let length = raw_content.len();
                 let entry = JsonEntry {
                     raw_content,
+                    subreddit,
                     length,
                 };
                 let json_string = serde_json::to_string(&entry)?;
                 writeln!(writer, "{json_string}")?;
-                // if thread_length > longest_thread {
-                //     long_string = inner_long_string;
-                //     longest_thread = thread_length;
-                // }
             }
             pb.inc(1);
         }

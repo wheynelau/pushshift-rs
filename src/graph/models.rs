@@ -7,6 +7,7 @@ use serde_json::Value;
 pub struct Reddit {
     pub id: String,
     pub selftext: String,
+    pub subreddit: String,
     pub parent_id: Option<String>,
 }
 
@@ -15,6 +16,7 @@ pub struct Thread {
     pub name: String,
     pub selftext: String,
     pub num_comments: u64,
+    pub subreddit: String,
 }
 #[derive(Deserialize, Serialize)]
 pub struct Comment {
@@ -24,6 +26,7 @@ pub struct Comment {
     pub score: u64,
     pub ups: u64,
     pub downs: u64,
+    pub subreddit: String,
 }
 
 impl Reddit {
@@ -49,10 +52,12 @@ impl Reddit {
                 });
 
             let parent_id = json.get("parent_id").unwrap().as_str().unwrap();
+            let subreddit = json.get("subreddit").unwrap().as_str().unwrap().to_string();
             let comment = Reddit {
                 id: id.to_string(),
                 selftext: body.to_string(),
                 parent_id: Some(parent_id.to_string()),
+                subreddit,
             };
             Some(comment)
         } else {
@@ -80,7 +85,7 @@ impl Reddit {
                     panic!("Neither 'id' nor 'name' is a string");
                 });
             let selftext = json.get("selftext").unwrap().as_str().unwrap().to_string();
-
+            let subreddit = json.get("subreddit").unwrap().as_str().unwrap().to_string();
             if selftext.len() < 10 {
                 return None;
             }
@@ -89,6 +94,7 @@ impl Reddit {
                 id: id.to_string(),
                 selftext,
                 parent_id: None,
+                subreddit,
             };
 
             Some(thread)
@@ -120,24 +126,8 @@ impl Comment {
             id: self.name,
             selftext,
             parent_id: Some(self.parent_id),
+            subreddit: self.subreddit,
         })
-    }
-}
-
-impl TryFrom<Comment> for Reddit {
-    type Error = anyhow::Error;
-    fn try_from(comment: Comment) -> Result<Reddit, Self::Error> {
-        let selftext = comment.body;
-        if selftext == "[deleted]" || selftext == "[removed]" {
-            bail!("Comment is deleted or removed");
-        }
-
-        let reddit = Reddit {
-            id: comment.name,
-            selftext,
-            parent_id: Some(comment.parent_id),
-        };
-        Ok(reddit)
     }
 }
 
@@ -156,6 +146,7 @@ impl TryFrom<Thread> for Reddit {
             id,
             selftext,
             parent_id: None,
+            subreddit: thread.subreddit,
         };
         Ok(reddit)
     }
@@ -180,7 +171,7 @@ mod tests {
 
             // New method: parse to Comment struct, then use TryFrom
             let comment: Comment = serde_json::from_str(&line).unwrap();
-            let reddit_new: Option<Reddit> = comment.try_into().ok();
+            let reddit_new: Option<Reddit> = comment.into_reddit(false).ok();
 
             // Verify both methods produce the same result
             assert_eq!(
