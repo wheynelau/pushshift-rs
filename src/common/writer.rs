@@ -8,6 +8,7 @@ pub struct JsonEntry {
     pub raw_content: String,
     pub length: usize,
     pub subreddit: String,
+    pub permalink: Option<String>,
 }
 
 pub fn setup_writer<P: AsRef<Path>>(filename: P, level: i32) -> Box<dyn Write> {
@@ -17,11 +18,10 @@ pub fn setup_writer<P: AsRef<Path>>(filename: P, level: i32) -> Box<dyn Write> {
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("zst"))
     {
-        // Use zstd encoder for .zst files
         let encoder = zstd::stream::write::Encoder::new(outfile, level)
             .expect("Failed to create zstd encoder")
             .auto_finish();
-        Box::new(BufWriter::new(encoder))
+        Box::new(encoder)
     } else {
         // Write directly for other files (e.g., .jsonl)
         Box::new(BufWriter::new(outfile))

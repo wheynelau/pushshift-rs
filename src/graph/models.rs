@@ -9,6 +9,7 @@ pub struct Reddit {
     pub selftext: String,
     pub subreddit: String,
     pub parent_id: Option<String>,
+    pub permalink: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -17,6 +18,7 @@ pub struct Thread {
     pub selftext: String,
     pub num_comments: u64,
     pub subreddit: String,
+    pub permalink: String,
 }
 #[derive(Deserialize, Serialize)]
 pub struct Comment {
@@ -53,11 +55,13 @@ impl Reddit {
 
             let parent_id = json.get("parent_id").unwrap().as_str().unwrap();
             let subreddit = json.get("subreddit").unwrap().as_str().unwrap().to_string();
+            let permalink = json.get("permalink").unwrap().as_str().unwrap().to_string();
             let comment = Reddit {
                 id: id.to_string(),
                 selftext: body.to_string(),
                 parent_id: Some(parent_id.to_string()),
                 subreddit,
+                permalink: Some(permalink),
             };
             Some(comment)
         } else {
@@ -86,6 +90,7 @@ impl Reddit {
                 });
             let selftext = json.get("selftext").unwrap().as_str().unwrap().to_string();
             let subreddit = json.get("subreddit").unwrap().as_str().unwrap().to_string();
+            let permalink = Some(json.get("permalink").unwrap().as_str().unwrap().to_string());
             if selftext.len() < 10 {
                 return None;
             }
@@ -95,6 +100,7 @@ impl Reddit {
                 selftext,
                 parent_id: None,
                 subreddit,
+                permalink,
             };
 
             Some(thread)
@@ -106,11 +112,11 @@ impl Reddit {
 }
 
 impl Comment {
-    pub fn into_reddit(self, include_scores: bool) -> Result<Reddit, anyhow::Error> {
+    pub fn into_reddit(self, include_scores: bool) -> Option<Reddit> {
         let selftext = self.body;
 
-        if selftext == "[deleted]" || selftext == "[removed]" {
-            bail!("Comment is deleted or removed");
+        if selftext.len() < 10 || selftext == "[deleted]" || selftext == "[removed]" {
+            return None;
         }
 
         let selftext = if include_scores {
@@ -122,11 +128,12 @@ impl Comment {
             selftext
         };
 
-        Ok(Reddit {
+        Some(Reddit {
             id: self.name,
             selftext,
             parent_id: Some(self.parent_id),
             subreddit: self.subreddit,
+            permalink: None,
         })
     }
 }
@@ -147,6 +154,7 @@ impl TryFrom<Thread> for Reddit {
             selftext,
             parent_id: None,
             subreddit: thread.subreddit,
+            permalink: Some(thread.permalink),
         };
         Ok(reddit)
     }
@@ -171,7 +179,7 @@ mod tests {
 
             // New method: parse to Comment struct, then use TryFrom
             let comment: Comment = serde_json::from_str(&line).unwrap();
-            let reddit_new: Option<Reddit> = comment.into_reddit(false).ok();
+            let reddit_new: Option<Reddit> = comment.into_reddit(false);
 
             // Verify both methods produce the same result
             assert_eq!(

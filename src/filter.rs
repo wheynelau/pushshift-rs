@@ -68,6 +68,13 @@ fn validate_args(args: &FilterArgs) -> Result<()> {
                  Example: --output filtered_{{subreddit}}.jsonl"
             );
         }
+
+        if args.input.len() > 1 && !output_str.contains("{basename}") {
+            bail!(
+                "When processing multiple input files, --output must contain {{basename}} placeholder to avoid concurrent writes.\n\
+                 Example: --output processed/{{basename}}.zst"
+            );
+        }
     }
 
     Ok(())
@@ -119,7 +126,7 @@ fn run_filter_st(args: &FilterArgs, mb: MultiProgress) -> Result<()> {
         let (mut file_map, mut combined_writer) =
             setup_file_writers(input_path, args).expect("Failed to setup file writers");
 
-        let reader = common::setup_reader(input_path, &pb);
+        let reader = common::setup_reader(input_path, &pb).unwrap();
         let mut filtered_count = 0u64;
 
         reader.lines().map_while(Result::ok).for_each(|line| {
@@ -162,7 +169,7 @@ fn process_single_file(input_path: &PathBuf, args: &FilterArgs, mb: MultiProgres
     let (producer_result, consumer_result) = rayon::join(
         || {
             // Producer: Decompression
-            let reader = common::setup_reader(input_path, &pb);
+            let reader = common::setup_reader(input_path, &pb)?;
             for line in reader.lines() {
                 if let Ok(l) = line {
                     if line_sender.send(l).is_err() {

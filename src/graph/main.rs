@@ -21,17 +21,20 @@ pub fn run_process(args: ProcessArgs) -> Result<()> {
     );
     let mut submission_count = 0u32;
     for path in args.submissions {
-        let reader = setup_reader(path, &pb);
+        let reader = setup_reader(path, &pb)?;
         reader
             .lines()
-            .map_while(Result::ok)
-            .filter_map(|line| serde_json::from_str::<Thread>(&line).ok())
-            .filter_map(|json| TryInto::<Reddit>::try_into(json).ok())
-            .for_each(|thread| {
-                thread_graph.add_threads(&thread.id);
-                thread_graph.add_node(&thread.id);
-                threads.push(thread);
-            });
+            .try_for_each::<_, Result<(), std::io::Error>>(|line| {
+                let line = line?;
+                if let Ok(json) = serde_json::from_str::<Thread>(&line)
+                    && let Ok(reddit) = TryInto::<Reddit>::try_into(json)
+                {
+                    thread_graph.add_threads(&reddit.id);
+                    thread_graph.add_node(&reddit.id);
+                    threads.push(reddit);
+                }
+                Ok(())
+            })?;
         submission_count += 1;
     }
     pb.finish_with_message(format!("Completed {submission_count} submissions file"));
@@ -43,24 +46,25 @@ pub fn run_process(args: ProcessArgs) -> Result<()> {
     );
     // Test out if loading all to memory is a good idea
     submission_count = 0;
-    args.comments.into_iter().for_each(|path| {
-        let reader = setup_reader(path, &pb);
+    for path in args.comments {
+        let reader = setup_reader(path, &pb)?;
         reader
             .lines()
-            .map_while(Result::ok)
-            .filter_map(|line| serde_json::from_str::<Comment>(&line).ok())
-            .filter_map(|json| json.into_reddit(args.include_scores).ok())
-            .for_each(|comment| {
-                if let Some(parent_id) = &comment.parent_id
+            .try_for_each::<_, Result<(), std::io::Error>>(|line| {
+                let line = line?;
+                if let Ok(json) = serde_json::from_str::<Comment>(&line)
+                    && let Some(comment) = json.into_reddit(args.include_scores)
+                    && let Some(parent_id) = &comment.parent_id
                     && thread_graph.is_in_map(parent_id)
                 {
                     thread_graph.add_node(&comment.id);
                     thread_graph.add_edge(parent_id, &comment.id);
                     threads.push(comment);
                 }
-            });
+                Ok(())
+            })?;
         submission_count += 1;
-    });
+    }
     pb.finish_with_message(format!("Completed {submission_count} comments file"));
 
     thread_graph.tranverse(threads, args.output, args.compression.level)?;
