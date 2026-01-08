@@ -60,6 +60,7 @@ impl ThreadGraph {
             // Find all leaf nodes in this thread's subgraph
             let mut leaves: Vec<NodeIndex> = Vec::new();
             let mut dfs = Dfs::new(&self.graph, *start);
+            let created_utc = &vec_threads[start.index()].created_utc;
 
             while let Some(node) = dfs.next(&self.graph) {
                 // A leaf has no outgoing edges
@@ -116,6 +117,7 @@ impl ThreadGraph {
                         subreddit,
                         length,
                         permalink,
+                        created_utc: *created_utc,
                     };
                     let json_string = serde_json::to_string(&entry)?;
                     writeln!(writer, "{json_string}")?;
@@ -173,6 +175,7 @@ mod tests {
             subreddit: "test".to_string(),
             parent_id: None,
             permalink: Some("/r/test/A".to_string()),
+            created_utc: None,
         });
         vec_threads.push(Reddit {
             id: "B".to_string(),
@@ -180,6 +183,7 @@ mod tests {
             subreddit: "test".to_string(),
             parent_id: Some("A".to_string()),
             permalink: Some("/r/test/B".to_string()),
+            created_utc: None,
         });
         vec_threads.push(Reddit {
             id: "C".to_string(),
@@ -187,6 +191,7 @@ mod tests {
             subreddit: "test".to_string(),
             parent_id: Some("B".to_string()),
             permalink: Some("/r/test/C".to_string()),
+            created_utc: None,
         });
         vec_threads.push(Reddit {
             id: "D".to_string(),
@@ -194,6 +199,7 @@ mod tests {
             subreddit: "test".to_string(),
             parent_id: Some("A".to_string()),
             permalink: Some("/r/test/D".to_string()),
+            created_utc: None,
         });
         vec_threads.push(Reddit {
             id: "E".to_string(),
@@ -201,6 +207,7 @@ mod tests {
             subreddit: "test".to_string(),
             parent_id: Some("D".to_string()),
             permalink: Some("/r/test/E".to_string()),
+            created_utc: None,
         });
 
         // Traverse using linear path extraction

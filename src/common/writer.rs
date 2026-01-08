@@ -9,6 +9,7 @@ pub struct JsonEntry {
     pub length: usize,
     pub subreddit: String,
     pub permalink: Option<String>,
+    pub created_utc: Option<u64>,
 }
 
 pub fn setup_writer<P: AsRef<Path>>(filename: P, level: i32) -> Box<dyn Write> {

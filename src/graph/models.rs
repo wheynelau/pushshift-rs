@@ -10,6 +10,7 @@ pub struct Reddit {
     pub subreddit: String,
     pub parent_id: Option<String>,
     pub permalink: Option<String>,
+    pub created_utc: Option<u64>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -19,6 +20,7 @@ pub struct Thread {
     pub num_comments: u64,
     pub subreddit: String,
     pub permalink: String,
+    pub created_utc: u64,
 }
 #[derive(Deserialize, Serialize)]
 pub struct Comment {
@@ -62,6 +64,7 @@ impl Reddit {
                 parent_id: Some(parent_id.to_string()),
                 subreddit,
                 permalink: Some(permalink),
+                created_utc: None,
             };
             Some(comment)
         } else {
@@ -95,12 +98,14 @@ impl Reddit {
                 return None;
             }
 
+            let created_utc = json.get("created_utc").unwrap().as_u64();
             let thread = Reddit {
                 id: id.to_string(),
                 selftext,
                 parent_id: None,
                 subreddit,
                 permalink,
+                created_utc,
             };
 
             Some(thread)
@@ -134,6 +139,7 @@ impl Comment {
             parent_id: Some(self.parent_id),
             subreddit: self.subreddit,
             permalink: None,
+            created_utc: None,
         })
     }
 }
@@ -149,12 +155,17 @@ impl TryFrom<Thread> for Reddit {
         if selftext.len() < 10 {
             bail!("Thread is too short");
         }
+        if selftext == "[deleted]" || selftext == "[removed]" {
+            bail!("Thread is deleted or removed");
+        }
+        let created_utc = thread.created_utc;
         let reddit = Reddit {
             id,
             selftext,
             parent_id: None,
             subreddit: thread.subreddit,
             permalink: Some(thread.permalink),
+            created_utc: Some(created_utc),
         };
         Ok(reddit)
     }

@@ -14,21 +14,7 @@ use crate::cli::FilterArgs;
 use crate::common;
 type FileMap = HashMap<String, Box<dyn Write>>;
 
-/// Main entry point for the filter subcommand
-pub fn run_filter(args: FilterArgs) -> Result<()> {
-    // Validate first
-    validate_args(&args)?;
-
-    let mb = MultiProgress::new();
-
-    if args.multithread {
-        run_filter_mt(&args, mb)
-    } else {
-        run_filter_st(&args, mb)
-    }
-}
-
-fn validate_args(args: &FilterArgs) -> Result<()> {
+pub fn validate_args(args: &FilterArgs) -> Result<()> {
     // 1. Use bail! for early returns. No more manual Error::new calls.
 
     let valid_placeholders = &["basename", "subreddit", "timestamp"];
@@ -117,7 +103,7 @@ fn construct_filename(
 
 /// This is for running a single threaded operation
 /// Useful for debugging and testing, or in constrained environments
-fn run_filter_st(args: &FilterArgs, mb: MultiProgress) -> Result<()> {
+pub fn run_filter_st(args: &FilterArgs, mb: MultiProgress) -> Result<()> {
     args.input.par_iter().for_each(|input_path| {
         let file_name = input_path.to_str().expect("Failed to convert to string");
 
@@ -205,7 +191,7 @@ fn process_single_file(input_path: &PathBuf, args: &FilterArgs, mb: MultiProgres
     producer_result.and(consumer_result)
 }
 
-fn run_filter_mt(args: &FilterArgs, mb: MultiProgress) -> Result<()> {
+pub fn run_filter_mt(args: &FilterArgs, mb: MultiProgress) -> Result<()> {
     args.input.par_iter().for_each(|input_path| {
         process_single_file(input_path, args, mb.clone()).expect("Failed to process file");
     });
