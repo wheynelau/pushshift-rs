@@ -1,12 +1,13 @@
 [package]
 name = "reddit-rs"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2024"
 repository = "https://github.com/wheynelau/pushshift-rs"
 
 [dependencies]
+ahash = "0.8.11"
 anyhow = "1.0.100"
-clap = { version = "4.5.54", features = ["derive"] }
+clap = { version = "4.5.56", features = ["derive"] }
 crossbeam-channel = "0.5.15"
 gjson = "0.8.1"
 indicatif = "0.18.3"
@@ -14,8 +15,8 @@ petgraph = { version = "0.8.3", features = ["rayon"] }
 rayon = "1.11.0"
 regex = "1.12.2"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.148"
-zstd = { version = "0.13.3" }
+serde_json = "1.0.149"
+zstd = { version = "0.13.3", features = ["zstdmt"] }
 
 [dev-dependencies]
 criterion = { version = "0.8.1", features = ["html_reports"] }
@@ -24,4 +25,8 @@ simd-json = "0.17.0"
 # The profile that 'dist' will build with
 [profile.dist]
 inherits = "release"
-lto = "thin"
+
+
+[profile.release]
+codegen-units = 1
+lto = "fat"

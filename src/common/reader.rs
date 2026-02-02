@@ -22,7 +22,7 @@ pub fn setup_reader<P: AsRef<Path>>(
         Box::new(BufReader::new(decoder))
     } else if path
         .extension()
-        .is_some_and(|ext| ext.eq_ignore_ascii_case(".jsonl"))
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("jsonl"))
     {
         // Read directly for other files (e.g., .jsonl)
         Box::new(BufReader::new(progress_reader))

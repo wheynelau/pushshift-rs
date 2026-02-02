@@ -12,9 +12,5 @@ pub fn run_filter(args: FilterArgs) -> Result<()> {
 
     let mb = MultiProgress::new();
 
-    if args.multithread {
-        utils::run_filter_mt(&args, mb)
-    } else {
-        utils::run_filter_st(&args, mb)
-    }
+    utils::run_filter(&args, mb)
 }

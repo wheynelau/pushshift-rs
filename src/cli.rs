@@ -33,6 +33,14 @@ pub struct CompressionArgs {
         value_parser = clap::value_parser!(i32).range(0..23)
     )]
     pub level: i32,
+
+    #[arg(
+        short,
+        long,
+        help = "Parallel workers for compression.",
+        default_value = "0"
+    )]
+    pub workers: u32,
 }
 
 #[derive(Args, Clone)]
@@ -92,15 +100,6 @@ pub struct FilterArgs {
 
     #[command(flatten)]
     pub compression: CompressionArgs,
-
-    /// Run in multithreaded mode
-    #[arg(short,
-        long,
-        action=clap::ArgAction::SetTrue,
-        default_value = "false",
-        help = "Multithreaded may be misleading here, but what it means is a single thread is used for read and decompress, a second thread is for json and writes
-                This can be useful if you have a fast IO. This is quite experimental.")]
-    pub multithread: bool,
 }
 
 #[allow(clippy::unnecessary_wraps)]

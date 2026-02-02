@@ -54,24 +54,21 @@ reddit-rs process -s submissions_*.zst -c comments_*.zst -o output.zst
 ### Notes
 This task is mostly for LLM processing. It will merge the posts and comments into a single file.
 
-Each line of json will be a single post, with DFS order on the comments. Additionally, there is a flag `--include-scores`, that adds the scores to the comments.
-It can be useful if you need the scores information for a downstream task. 
+A linear branch is defined as a chain of comments where each comment directly replies to the previous one, starting from a top-level comment (a comment that replies to the submission itself).
 
-### Example of an output
+For example, if we have comments with the following reply structure:
+- A (top-level comment)
+  - B (replies to A)
+    - C (replies to B)
+    - D (replies to B)
+  - E (replies to A)
 
-The output always contains three fields, `raw_content`, `subreddit`, and `length`. 
+The branches would be
+1. A -> B -> C
+2. A -> B -> D
+3. A -> E
 
-For now the length is just a simple `.len()`, but can be modified to use tokenizers or split by whitespace. 
-
-`raw_content` is the text of the DFS processing.
-
-```json
-{
-    "raw_content": "What are you waiting for?\n\n{score: 2 Ups: 2 Downs: 0}\n\nyup!\n\n{score: 3 Ups: 3 Downs: 0}",
-    "subreddit" : "funny",
-    "length" : 600
-}
-```
+Each of these branches is represented as a single JSON object per line in the output file. This structure is particularly useful for language model processing, as it provides conversational context in a sequential format. This is still quite experimnetal, as the downside of this is potentially short threads.
 
 ## Issues and Contributions
 

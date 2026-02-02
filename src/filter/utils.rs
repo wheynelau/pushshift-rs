@@ -1,5 +1,4 @@
-use anyhow::{Context, Error, Result, bail};
-use crossbeam_channel::bounded;
+use anyhow::{Context, Result, bail};
 use gjson;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
@@ -7,7 +6,6 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufWriter, Write};
-use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::cli::FilterArgs;
@@ -103,7 +101,7 @@ fn construct_filename(
 
 /// This is for running a single threaded operation
 /// Useful for debugging and testing, or in constrained environments
-pub fn run_filter_st(args: &FilterArgs, mb: MultiProgress) -> Result<()> {
+pub fn run_filter(args: &FilterArgs, mb: MultiProgress) -> Result<()> {
     args.input.par_iter().for_each(|input_path| {
         let file_name = input_path.to_str().expect("Failed to convert to string");
 
@@ -139,65 +137,6 @@ fn setup_progress_bar(filename: &str) -> ProgressBar {
     pb.enable_steady_tick(Duration::from_millis(10));
     pb
 }
-
-fn process_single_file(input_path: &PathBuf, args: &FilterArgs, mb: MultiProgress) -> Result<()> {
-    let file_name = input_path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("unknown");
-    let pb = setup_progress_bar(file_name);
-    let pb = mb.add(pb);
-
-    let (line_sender, line_receiver) = bounded(1_000);
-
-    // Using rayon::join runs two closures in parallel.
-    // It returns when both are finished.
-    let (producer_result, consumer_result) = rayon::join(
-        || {
-            // Producer: Decompression
-            let reader = common::setup_reader(input_path, &pb)?;
-            for line in reader.lines() {
-                if let Ok(l) = line {
-                    if line_sender.send(l).is_err() {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
-            Ok::<(), Error>(())
-        },
-        || {
-            // Consumer: JSON Processing & Writing
-            let (mut file_map, mut combined_writer) = setup_file_writers(input_path, args)?;
-            let mut filtered_count = 0u64;
-
-            for line in line_receiver {
-                if process_and_write_line(&line, args, &mut file_map, &mut combined_writer)
-                    .is_ok_and(|b| b)
-                {
-                    filtered_count += 1;
-                    pb.set_message(format!("Filtering: {filtered_count}"));
-                }
-            }
-
-            flush_writers(file_map, combined_writer)?;
-            pb.finish_with_message(format!("Filtered: {filtered_count}"));
-            Ok::<(), Error>(())
-        },
-    );
-
-    // Propagate the first error encountered, if any
-    producer_result.and(consumer_result)
-}
-
-pub fn run_filter_mt(args: &FilterArgs, mb: MultiProgress) -> Result<()> {
-    args.input.par_iter().for_each(|input_path| {
-        process_single_file(input_path, args, mb.clone()).expect("Failed to process file");
-    });
-    Ok(())
-}
-
 /// Sets up file writers based on split mode
 fn setup_file_writers<P: AsRef<std::path::Path>>(
     input_file: P,
@@ -267,7 +206,8 @@ fn setup_file_writers<P: AsRef<std::path::Path>>(
                     &ext,
                     append_ext,
                 );
-                let writer = common::setup_writer(filename, args.compression.level);
+                let writer = common::setup_writer(filename, &args.compression)
+                    .expect("Unable to setup writer");
                 (name.clone(), writer)
             })
             .collect();
@@ -318,6 +258,8 @@ fn process_and_write_line(
 
     Ok(written)
 }
+
+/// Experimental, write to parquet
 
 /// Flushes all open writers
 fn flush_writers(

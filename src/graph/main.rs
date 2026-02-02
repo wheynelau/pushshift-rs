@@ -12,7 +12,6 @@ use anyhow::Result;
 use crate::common::setup_reader;
 pub fn run_process(args: ProcessArgs) -> Result<()> {
     let mut thread_graph = super::threadgraph::ThreadGraph::new();
-    let mut threads: Vec<Reddit> = Vec::new();
 
     let pb = ProgressBar::no_length();
     pb.set_style(
@@ -29,9 +28,9 @@ pub fn run_process(args: ProcessArgs) -> Result<()> {
                 if let Ok(json) = serde_json::from_str::<Thread>(&line)
                     && let Ok(reddit) = TryInto::<Reddit>::try_into(json)
                 {
-                    thread_graph.add_threads(&reddit.id);
-                    thread_graph.add_node(&reddit.id);
-                    threads.push(reddit);
+                    let id = reddit.id.clone();
+                    thread_graph.add_reddit_data(&id, reddit);
+                    thread_graph.add_threads(&id);
                 }
                 Ok(())
             })?;
@@ -44,7 +43,6 @@ pub fn run_process(args: ProcessArgs) -> Result<()> {
         ProgressStyle::with_template("[{elapsed_precise}] {bytes} ({bytes_per_sec}) {msg}")
             .expect("Failed to set progress style"),
     );
-    // Test out if loading all to memory is a good idea
     submission_count = 0;
     for path in args.comments {
         let reader = setup_reader(path, &pb)?;
@@ -54,12 +52,12 @@ pub fn run_process(args: ProcessArgs) -> Result<()> {
                 let line = line?;
                 if let Ok(json) = serde_json::from_str::<Comment>(&line)
                     && let Some(comment) = json.into_reddit(args.include_scores)
-                    && let Some(parent_id) = &comment.parent_id
-                    && thread_graph.is_in_map(parent_id)
+                    && let Some(parent_id) = comment.parent_id.clone()
+                    && thread_graph.is_in_map(&parent_id)
                 {
-                    thread_graph.add_node(&comment.id);
-                    thread_graph.add_edge(parent_id, &comment.id);
-                    threads.push(comment);
+                    let id = comment.id.clone();
+                    thread_graph.add_reddit_data(&id, comment);
+                    thread_graph.add_edge(&parent_id, &id);
                 }
                 Ok(())
             })?;
@@ -67,6 +65,6 @@ pub fn run_process(args: ProcessArgs) -> Result<()> {
     }
     pb.finish_with_message(format!("Completed {submission_count} comments file"));
 
-    thread_graph.tranverse(threads, args.output, args.compression.level)?;
+    thread_graph.traverse(args.output, &args.compression)?;
     Ok(())
 }

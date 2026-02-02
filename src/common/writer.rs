@@ -1,7 +1,10 @@
+use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
+
+use crate::cli::CompressionArgs;
 
 #[derive(Serialize, Deserialize)]
 pub struct JsonEntry {
@@ -12,20 +15,23 @@ pub struct JsonEntry {
     pub created_utc: Option<u64>,
 }
 
-pub fn setup_writer<P: AsRef<Path>>(filename: P, level: i32) -> Box<dyn Write> {
+pub fn setup_writer<P: AsRef<Path>>(
+    filename: P,
+    args: &CompressionArgs,
+) -> Result<Box<dyn Write>, Error> {
     let path = filename.as_ref();
-    let outfile = File::create(path).expect("Failed to create output file");
+    let outfile = File::create(path)?;
     let writer: Box<dyn Write> = if path
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("zst"))
     {
-        let encoder = zstd::stream::write::Encoder::new(outfile, level)
-            .expect("Failed to create zstd encoder")
-            .auto_finish();
-        Box::new(encoder)
+        let mut encoder = zstd::stream::write::Encoder::new(outfile, args.level)?;
+
+        encoder.multithread(args.workers)?;
+        Box::new(encoder.auto_finish())
     } else {
         // Write directly for other files (e.g., .jsonl)
         Box::new(BufWriter::new(outfile))
     };
-    writer
+    Ok(writer)
 }

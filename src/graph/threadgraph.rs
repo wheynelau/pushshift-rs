@@ -1,3 +1,4 @@
+use ahash::AHashMap;
 use indicatif::{ProgressBar, ProgressStyle};
 use petgraph::Direction;
 use petgraph::Graph;
@@ -13,9 +14,11 @@ pub struct ThreadGraph {
     graph: Graph<(), ()>,
     node_map: HashMap<String, NodeIndex>,
     threads: Vec<NodeIndex>,
+    reddit_data: AHashMap<NodeIndex, super::models::Reddit>,
 }
 
 use super::models::Reddit;
+use crate::cli::CompressionArgs;
 use crate::common::writer::{JsonEntry, setup_writer};
 
 impl ThreadGraph {
@@ -24,6 +27,7 @@ impl ThreadGraph {
             graph: DiGraph::new(),
             node_map: HashMap::new(),
             threads: Vec::new(),
+            reddit_data: AHashMap::new(),
         }
     }
 
@@ -37,14 +41,21 @@ impl ThreadGraph {
         }
     }
 
+    /// Adds or updates Reddit data for a node
+    pub fn add_reddit_data(&mut self, id: &str, reddit: Reddit) -> NodeIndex {
+        let idx = self.add_node(id);
+        self.reddit_data.insert(idx, reddit);
+        idx
+    }
+
     pub fn add_edge(&mut self, from_id: &str, to_id: &str) {
         let from_idx = self.add_node(from_id);
         let to_idx = self.add_node(to_id);
         self.graph.add_edge(from_idx, to_idx, ());
     }
 
-    pub fn tranverse(&self, vec_threads: Vec<Reddit>, output: PathBuf, level: i32) -> Result<()> {
-        let mut writer = setup_writer(output, level);
+    pub fn traverse(&self, output: PathBuf, args: &CompressionArgs) -> Result<()> {
+        let mut writer = setup_writer(output, args)?;
 
         let pb = ProgressBar::new(self.threads.len() as u64);
         pb.set_style(
@@ -60,7 +71,7 @@ impl ThreadGraph {
             // Find all leaf nodes in this thread's subgraph
             let mut leaves: Vec<NodeIndex> = Vec::new();
             let mut dfs = Dfs::new(&self.graph, *start);
-            let created_utc = &vec_threads[start.index()].created_utc;
+            let created_utc = self.reddit_data.get(start).and_then(|r| r.created_utc);
 
             while let Some(node) = dfs.next(&self.graph) {
                 // A leaf has no outgoing edges
@@ -94,14 +105,22 @@ impl ThreadGraph {
 
                 // Only process paths with more than just the root
                 if path.len() > 1 {
-                    let subreddit = vec_threads[path[0].index()].subreddit.clone();
-                    let permalink = vec_threads[path[0].index()].permalink.clone();
+                    let root_data = self
+                        .reddit_data
+                        .get(&path[0])
+                        .expect("Root node must have data");
+                    let subreddit = root_data.subreddit.clone();
+                    let permalink = root_data.permalink.clone();
 
                     let raw_content = path
                         .iter()
                         .enumerate()
                         .map(|(i, node)| {
-                            let content = &vec_threads[node.index()].selftext;
+                            let content = &self
+                                .reddit_data
+                                .get(node)
+                                .expect("Node must have data")
+                                .selftext;
                             if i == 0 {
                                 format!("# Post\n\n{content}")
                             } else {
@@ -117,7 +136,7 @@ impl ThreadGraph {
                         subreddit,
                         length,
                         permalink,
-                        created_utc: *created_utc,
+                        created_utc,
                     };
                     let json_string = serde_json::to_string(&entry)?;
                     writeln!(writer, "{json_string}")?;
@@ -153,14 +172,64 @@ mod tests {
     #[test]
     fn test_linear_path_extraction_two_branches() {
         let mut graph = ThreadGraph::new();
-        let mut vec_threads: Vec<Reddit> = Vec::new();
 
         // Build tree: A -> B -> C and A -> D -> E
-        graph.add_node("A");
-        graph.add_node("B");
-        graph.add_node("C");
-        graph.add_node("D");
-        graph.add_node("E");
+        // Add all Reddit data to the graph's HashMap
+        graph.add_reddit_data(
+            "A",
+            Reddit {
+                id: "A".to_string(),
+                selftext: "Content A".to_string(),
+                subreddit: "test".to_string(),
+                parent_id: None,
+                permalink: Some("/r/test/A".to_string()),
+                created_utc: None,
+            },
+        );
+        graph.add_reddit_data(
+            "B",
+            Reddit {
+                id: "B".to_string(),
+                selftext: "Content B".to_string(),
+                subreddit: "test".to_string(),
+                parent_id: Some("A".to_string()),
+                permalink: Some("/r/test/B".to_string()),
+                created_utc: None,
+            },
+        );
+        graph.add_reddit_data(
+            "C",
+            Reddit {
+                id: "C".to_string(),
+                selftext: "Content C".to_string(),
+                subreddit: "test".to_string(),
+                parent_id: Some("B".to_string()),
+                permalink: Some("/r/test/C".to_string()),
+                created_utc: None,
+            },
+        );
+        graph.add_reddit_data(
+            "D",
+            Reddit {
+                id: "D".to_string(),
+                selftext: "Content D".to_string(),
+                subreddit: "test".to_string(),
+                parent_id: Some("A".to_string()),
+                permalink: Some("/r/test/D".to_string()),
+                created_utc: None,
+            },
+        );
+        graph.add_reddit_data(
+            "E",
+            Reddit {
+                id: "E".to_string(),
+                selftext: "Content E".to_string(),
+                subreddit: "test".to_string(),
+                parent_id: Some("D".to_string()),
+                permalink: Some("/r/test/E".to_string()),
+                created_utc: None,
+            },
+        );
 
         graph.add_edge("A", "B");
         graph.add_edge("B", "C");
@@ -168,47 +237,6 @@ mod tests {
         graph.add_edge("D", "E");
 
         graph.add_threads("A");
-
-        vec_threads.push(Reddit {
-            id: "A".to_string(),
-            selftext: "Content A".to_string(),
-            subreddit: "test".to_string(),
-            parent_id: None,
-            permalink: Some("/r/test/A".to_string()),
-            created_utc: None,
-        });
-        vec_threads.push(Reddit {
-            id: "B".to_string(),
-            selftext: "Content B".to_string(),
-            subreddit: "test".to_string(),
-            parent_id: Some("A".to_string()),
-            permalink: Some("/r/test/B".to_string()),
-            created_utc: None,
-        });
-        vec_threads.push(Reddit {
-            id: "C".to_string(),
-            selftext: "Content C".to_string(),
-            subreddit: "test".to_string(),
-            parent_id: Some("B".to_string()),
-            permalink: Some("/r/test/C".to_string()),
-            created_utc: None,
-        });
-        vec_threads.push(Reddit {
-            id: "D".to_string(),
-            selftext: "Content D".to_string(),
-            subreddit: "test".to_string(),
-            parent_id: Some("A".to_string()),
-            permalink: Some("/r/test/D".to_string()),
-            created_utc: None,
-        });
-        vec_threads.push(Reddit {
-            id: "E".to_string(),
-            selftext: "Content E".to_string(),
-            subreddit: "test".to_string(),
-            parent_id: Some("D".to_string()),
-            permalink: Some("/r/test/E".to_string()),
-            created_utc: None,
-        });
 
         // Traverse using linear path extraction
         let mut outputs = Vec::new();
@@ -249,7 +277,7 @@ mod tests {
                         .iter()
                         .enumerate()
                         .map(|(i, node)| {
-                            let content = &vec_threads[node.index()].selftext;
+                            let content = &graph.reddit_data.get(node).unwrap().selftext;
                             if i == 0 {
                                 format!("# Post\n\n{content}")
                             } else {
