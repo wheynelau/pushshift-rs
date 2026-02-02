@@ -25,13 +25,7 @@ the subreddit must be known at the filtering stage.
 
 ### Performance notes
 
-- If an array of files is provided, the filtering is done in parallel using rayon. There is also an experimental flag called `--multithreaded`,
-however it is meant to split a file into two workers. To reduce resource contention, its better to use the defaults. 
-
-Worker 1: Handles read and decompress
-Worker 2: Json serialization, filtering and writing
-
-- `zstd` supports multithreaded compression, but there are not plans for implementation. 
+- If an array of files is provided, the filtering is done in parallel using rayon. For `zstd` encoder, there is an argument `--workers` that allows for multithreaded `zstd` compression. 
 
 ### Example
 
