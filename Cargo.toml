@@ -25,6 +25,8 @@ simd-json = "0.17.0"
 # The profile that 'dist' will build with
 [profile.dist]
 inherits = "release"
+codegen-units = 1
+lto = "fat"
 
 
 [profile.release]
