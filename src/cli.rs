@@ -37,7 +37,7 @@ pub struct CompressionArgs {
     #[arg(
         short,
         long,
-        help = "Parallel workers for compression.",
+        help = "Number of parallel worker threads for zstd compression (0 = single-threaded).",
         default_value = "0"
     )]
     pub workers: u32,

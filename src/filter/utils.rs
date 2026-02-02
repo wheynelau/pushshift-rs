@@ -231,16 +231,21 @@ fn process_and_write_line(
     // Extract and filter subreddit
     let subreddit = extract_json(line);
 
-    let subreddit_lower = subreddit.to_lowercase();
+    let is_match = args
+        .name
+        .iter()
+        .any(|name| name.eq_ignore_ascii_case(subreddit.str()));
 
-    if !args.name.contains(&subreddit_lower) {
+    if !is_match {
         return Ok(false);
     }
+
+    let subreddit_key = subreddit.str().to_lowercase();
 
     // Write to appropriate destination
     let written = if args.split {
         if let Some(map) = file_map {
-            if let Some(writer) = map.get_mut(&subreddit_lower) {
+            if let Some(writer) = map.get_mut(&subreddit_key) {
                 writeln!(writer, "{line}")?;
                 true
             } else {
@@ -277,10 +282,9 @@ fn flush_writers(
 }
 
 /// Safer extraction with GJSON, as we only need the subreddit key
-fn extract_json(line: &str) -> String {
-    let subreddit: gjson::Value<'_> = gjson::get(line, "subreddit");
-
-    subreddit.to_string()
+// Returns gjson::Value which references data in the original line buffer.
+fn extract_json(line: &str) -> gjson::Value<'_> {
+    gjson::get(line, "subreddit")
 }
 
 #[cfg(test)]
@@ -291,13 +295,13 @@ mod tests {
     fn test_extract_nested_json() {
         // This must be tested to deal with crossposts, manual implementations of reading may fail here
         let line = r#"{"crosspost_parent_list": [{"subreddit": "foo"}],"subreddit": "bar"}"#;
-        assert_eq!(extract_json(line), String::from("bar"));
+        assert_eq!(extract_json(line).str(), "bar");
     }
     #[test]
     fn test_extract() {
         // This should pass easily
         let line = r#"{"subreddit": "bar"}"#;
-        assert_eq!(extract_json(line), String::from("bar"));
+        assert_eq!(extract_json(line).str(), "bar");
     }
 
     #[test]
