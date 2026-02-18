@@ -1,26 +1,34 @@
+use ahash::{AHashMap, AHashSet};
 use anyhow::{Context, Result, bail};
 use gjson;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use regex::Regex;
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufWriter, Write};
+use std::io::{BufRead, Write};
 use std::time::Duration;
 
 use crate::cli::FilterArgs;
 use crate::common;
-type FileMap = HashMap<String, Box<dyn Write>>;
+
+type FileMap = AHashMap<String, Box<dyn Write>>;
+
+/// Represents the two modes of filtered output writing.
+enum FilterWriter {
+    /// Split mode: each subreddit gets its own file. The HashMap keys act as the filter.
+    Split(FileMap),
+    /// Combined mode: all matching lines go to one file, filtered by the HashSet.
+    Combined {
+        set: AHashSet<String>,
+        writer: Box<dyn Write>,
+    },
+}
 
 pub fn validate_args(args: &FilterArgs) -> Result<()> {
-    // 1. Use bail! for early returns. No more manual Error::new calls.
-
     let valid_placeholders = &["basename", "subreddit", "timestamp"];
 
     if let Some(output) = &args.output {
         let output_str = output.to_string_lossy();
 
-        // 2. You can use .context() or .with_context() if this Regex ever fails
         let placeholder_re =
             Regex::new(r"\{([^}]+)\}").context("Failed to compile placeholder regex")?;
 
@@ -99,30 +107,49 @@ fn construct_filename(
     }
 }
 
-/// This is for running a single threaded operation
-/// Useful for debugging and testing, or in constrained environments
+/// Processes input files in parallel using rayon
+/// Each input file is processed independently with its own progress bar and file writers
 pub fn run_filter(args: &FilterArgs, mb: MultiProgress) -> Result<()> {
     args.input.par_iter().for_each(|input_path| {
-        let file_name = input_path.to_str().expect("Failed to convert to string");
+        let file_name = match input_path.to_str() {
+            Some(s) => s,
+            None => {
+                eprintln!("Error: Invalid UTF-8 in path: {}", input_path.display());
+                return;
+            }
+        };
 
         let pb = setup_progress_bar(file_name);
         let pb = mb.add(pb);
-        let (mut file_map, mut combined_writer) =
-            setup_file_writers(input_path, args).expect("Failed to setup file writers");
+        let mut filter_writer = match setup_filter_writer(input_path, args) {
+            Ok(w) => w,
+            Err(e) => {
+                eprintln!(
+                    "Error setting up writers for {}: {}",
+                    input_path.display(),
+                    e
+                );
+                return;
+            }
+        };
 
-        let reader = common::setup_reader(input_path, &pb).unwrap();
+        let reader = match common::setup_reader(input_path, &pb) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("Error opening reader for {}: {}", input_path.display(), e);
+                return;
+            }
+        };
         let mut filtered_count = 0u64;
 
         reader.lines().map_while(Result::ok).for_each(|line| {
-            if process_and_write_line(&line, args, &mut file_map, &mut combined_writer)
-                .is_ok_and(|b| b)
-            {
+            if process_and_write_line(&line, &mut filter_writer).is_ok_and(|b| b) {
                 filtered_count += 1;
                 pb.set_message(format!("Filtering: {filtered_count}"));
             }
         });
 
-        flush_writers(file_map, combined_writer).expect("Failed to flush writers");
+        flush_writer(filter_writer).expect("Failed to flush writers");
         pb.finish_with_message(format!("Filtered: {filtered_count}"));
     });
     Ok(())
@@ -137,14 +164,15 @@ fn setup_progress_bar(filename: &str) -> ProgressBar {
     pb.enable_steady_tick(Duration::from_millis(10));
     pb
 }
-/// Sets up file writers based on split mode
-fn setup_file_writers<P: AsRef<std::path::Path>>(
+/// Sets up the appropriate FilterWriter based on split mode
+fn setup_filter_writer<P: AsRef<std::path::Path>>(
     input_file: P,
     args: &FilterArgs,
-) -> Result<(Option<FileMap>, Option<BufWriter<File>>)> {
+) -> Result<FilterWriter> {
     // Generate timestamp for placeholder expansion
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
+        // would this ever happen?
         .expect("System clock is set before Unix epoch - check system time!")
         .as_secs();
 
@@ -157,8 +185,7 @@ fn setup_file_writers<P: AsRef<std::path::Path>>(
         ("{basename}_filtered".to_string(), true)
     };
 
-    // Get basename from INPUT file (not output template)
-    // The {basename} placeholder always refers to the input filename
+    // Get basename from the input
     let basename = input_file
         .as_ref()
         .file_stem()
@@ -181,10 +208,8 @@ fn setup_file_writers<P: AsRef<std::path::Path>>(
     }
 
     // get the ext from outfile
-    let ext = if args.output.is_some() {
-        args.output
-            .as_ref()
-            .unwrap()
+    let ext = if let Some(output) = &args.output {
+        output
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("jsonl")
@@ -212,71 +237,50 @@ fn setup_file_writers<P: AsRef<std::path::Path>>(
             })
             .collect();
 
-        Ok((Some(map), None))
+        Ok(FilterWriter::Split(map))
     } else {
         let filename = construct_filename(&template, &basename, None, timestamp, &ext, append_ext);
-        let outfile = File::create(&filename)?;
-        Ok((None, Some(BufWriter::new(outfile))))
+        let writer = common::setup_writer(filename, &args.compression)?;
+        let set = args.name.iter().cloned().collect::<AHashSet<String>>();
+        Ok(FilterWriter::Combined { set, writer })
     }
 }
 
 /// Processes a single line: extracts subreddit, filters, and writes to appropriate file
 /// Returns true if the line was written, false otherwise
-fn process_and_write_line(
-    line: &str,
-    args: &FilterArgs,
-    file_map: &mut Option<FileMap>,
-    combined_writer: &mut Option<BufWriter<File>>,
-) -> Result<bool> {
-    // Extract and filter subreddit
-    let subreddit = extract_json(line);
+fn process_and_write_line(line: &str, filter_writer: &mut FilterWriter) -> Result<bool> {
+    let subreddit_key = extract_json(line).str().to_lowercase();
 
-    let is_match = args
-        .name
-        .iter()
-        .any(|name| name.eq_ignore_ascii_case(subreddit.str()));
-
-    if !is_match {
-        return Ok(false);
-    }
-
-    let subreddit_key = subreddit.str().to_lowercase();
-
-    // Write to appropriate destination
-    let written = if args.split {
-        if let Some(map) = file_map {
+    match filter_writer {
+        FilterWriter::Split(map) => {
             if let Some(writer) = map.get_mut(&subreddit_key) {
                 writeln!(writer, "{line}")?;
-                true
+                Ok(true)
             } else {
-                false
+                Ok(false)
             }
-        } else {
-            false
         }
-    } else if let Some(writer) = combined_writer {
-        writeln!(writer, "{line}")?;
-        true
-    } else {
-        false
-    };
-
-    Ok(written)
+        FilterWriter::Combined { set, writer } => {
+            if !set.contains(&subreddit_key) {
+                return Ok(false);
+            }
+            writeln!(writer, "{line}")?;
+            Ok(true)
+        }
+    }
 }
 
-/// Experimental, write to parquet
-
 /// Flushes all open writers
-fn flush_writers(
-    file_map: Option<FileMap>,
-    combined_writer: Option<BufWriter<File>>,
-) -> Result<()> {
-    if let Some(map) = file_map {
-        for (_, mut writer) in map {
+fn flush_writer(filter_writer: FilterWriter) -> Result<()> {
+    match filter_writer {
+        FilterWriter::Split(map) => {
+            for (_, mut writer) in map {
+                writer.flush()?;
+            }
+        }
+        FilterWriter::Combined { mut writer, .. } => {
             writer.flush()?;
         }
-    } else if let Some(mut writer) = combined_writer {
-        writer.flush()?;
     }
     Ok(())
 }

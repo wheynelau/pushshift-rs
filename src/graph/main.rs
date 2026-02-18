@@ -20,6 +20,7 @@ pub fn run_process(args: ProcessArgs) -> Result<()> {
     );
     let mut submission_count = 0u32;
     for path in args.submissions {
+        pb.set_message(format!("Processing submission file: {path:?}"));
         let reader = setup_reader(path, &pb)?;
         reader
             .lines()
@@ -45,6 +46,7 @@ pub fn run_process(args: ProcessArgs) -> Result<()> {
     );
     submission_count = 0;
     for path in args.comments {
+        pb.set_message(format!("Processing comments file {path:?}"));
         let reader = setup_reader(path, &pb)?;
         reader
             .lines()
