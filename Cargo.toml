@@ -1,6 +1,6 @@
 [package]
 name = "reddit-rs"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 repository = "https://github.com/wheynelau/pushshift-rs"
 
@@ -27,8 +27,17 @@ simd-json = "0.17.0"
 inherits = "release"
 codegen-units = 1
 lto = "fat"
+strip = true
 
+[profile.thin]
+inherits = "release"
+lto = "thin"
 
-[profile.release]
-codegen-units = 1
-lto = "fat"
+[[bench]]
+name = "json_bench"
+harness = false
+
+[[bench]]
+name = "subreddit_lookup_bench"
+harness = false
+

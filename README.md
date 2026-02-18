@@ -65,7 +65,7 @@ Output must end with `.jsonl` or `.zst` (the extension is required and validated
 ### Arguments
 
 - `-i, --input` - Input file(s), supports glob patterns like `*.zst`
-- `-n, --names` - Subreddit names to filter (space-separated)
+- `-n, --names` - Subreddit names to filter (space-separated, case insensitive)
 - `-o, --output` - Output file pattern. Supports `{basename}` and `{subreddit}` placeholders
 - `-l, --level` - Compression level for `.zst` output (default: 3, range 1-22). Higher levels = better compression but slower. Level 3 balances speed and size. Pushshift archives use level 22 for maximum compression
 - `--workers` - Number of parallel worker threads for `zstd` compression (default: 0, single-threaded). Set to 1 or higher to enable multithreading

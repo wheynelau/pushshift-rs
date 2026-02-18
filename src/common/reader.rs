@@ -1,33 +1,36 @@
-use anyhow::{Error, bail};
+use anyhow::{Context, Error, bail};
 use indicatif::ProgressBar;
-/// Handles the reading of files
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use zstd::stream::read::Decoder;
 
+/// Handles the reading of files
 pub fn setup_reader<P: AsRef<Path>>(
     input_path: P,
     pb: &ProgressBar,
 ) -> Result<Box<dyn BufRead>, Error> {
     let path = input_path.as_ref();
-    let thread_file = File::open(path).expect("Failed to open input file");
-    let progress_reader = pb.wrap_read(thread_file);
-    let reader: Box<dyn BufRead> = if path
+    let file =
+        File::open(path).context(format!("Failed to open input file: {}", path.display()))?;
+    let progress_reader = pb.wrap_read(file);
+
+    if path
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("zst"))
     {
-        // Use zstd decoder for .zst files
-        let decoder = Decoder::new(progress_reader).expect("Failed to create zstd decoder");
-        Box::new(BufReader::new(decoder))
+        let mut decoder = zstd::stream::read::Decoder::new(progress_reader)
+            .context("Failed to create zstd decoder")?;
+        decoder.window_log_max(31)?;
+        Ok(Box::new(BufReader::new(decoder)))
     } else if path
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("jsonl"))
     {
-        // Read directly for other files (e.g., .jsonl)
-        Box::new(BufReader::new(progress_reader))
+        Ok(Box::new(BufReader::new(progress_reader)))
     } else {
-        bail!("Unsupported file type");
-    };
-    Ok(reader)
+        bail!(
+            "Unsupported file type: {}",
+            path.extension().unwrap_or_default().to_string_lossy()
+        );
+    }
 }
