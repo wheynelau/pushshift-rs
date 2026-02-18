@@ -32,12 +32,3 @@ strip = true
 [profile.thin]
 inherits = "release"
 lto = "thin"
-
-[[bench]]
-name = "json_bench"
-harness = false
-
-[[bench]]
-name = "subreddit_lookup_bench"
-harness = false
-
