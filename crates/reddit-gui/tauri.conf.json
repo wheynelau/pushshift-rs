@@ -1,6 +1,6 @@
 {
   "productName": "reddit-rs",
-  "version": "0.3.0",
+  "version": "0.3.0-alpha.1",
   "identifier": "com.reddit-rs.gui",
   "build": {
     "frontendDist": "src/frontend"

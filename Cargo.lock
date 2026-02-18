@@ -2941,7 +2941,7 @@ dependencies = [
 
 [[package]]
 name = "reddit-cli"
-version = "0.3.0"
+version = "0.3.0-alpha.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -2950,7 +2950,7 @@ dependencies = [
 
 [[package]]
 name = "reddit-core"
-version = "0.3.0"
+version = "0.3.0-alpha.1"
 dependencies = [
  "ahash",
  "anyhow",
@@ -2968,7 +2968,7 @@ dependencies = [
 
 [[package]]
 name = "reddit-gui"
-version = "0.3.0"
+version = "0.3.0-alpha.1"
 dependencies = [
  "reddit-core",
  "serde",
