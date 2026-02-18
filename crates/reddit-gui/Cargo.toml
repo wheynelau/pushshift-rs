@@ -1,0 +1,14 @@
+[package]
+name = "reddit-gui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+reddit-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }

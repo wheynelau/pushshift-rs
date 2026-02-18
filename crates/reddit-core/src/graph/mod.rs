@@ -1,5 +1,5 @@
-pub(super) mod main;
+pub(super) mod run;
 pub(super) mod models;
 pub(super) mod threadgraph;
 
-pub use main::run_process;
+pub use run::run_process;

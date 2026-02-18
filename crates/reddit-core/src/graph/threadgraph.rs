@@ -18,7 +18,7 @@ pub struct ThreadGraph {
 }
 
 use super::models::Reddit;
-use crate::cli::CompressionArgs;
+use crate::args::CompressionArgs;
 use crate::common::writer::{JsonEntry, setup_writer};
 
 impl ThreadGraph {

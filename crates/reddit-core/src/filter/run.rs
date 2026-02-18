@@ -1,7 +1,7 @@
 use anyhow::Result;
 use indicatif::MultiProgress;
 
-use crate::cli::FilterArgs;
+use crate::args::FilterArgs;
 
 use super::utils;
 

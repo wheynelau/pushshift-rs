@@ -1,5 +1,5 @@
 [workspace]
-members = ["cargo:."]
+members = ["cargo:crates/reddit-cli"]
 
 # Config for 'dist'
 [dist]

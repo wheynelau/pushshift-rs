@@ -1,4 +1,5 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use reddit_core::args;
 
 #[derive(Parser)]
 #[command(name = "reddit-rs")]
@@ -105,4 +106,39 @@ pub struct FilterArgs {
 #[allow(clippy::unnecessary_wraps)]
 fn parse_lowercase(s: &str) -> Result<std::string::String, anyhow::Error> {
     Ok(s.to_lowercase())
+}
+
+// Conversion impls from CLI types to core types
+
+impl From<CompressionArgs> for args::CompressionArgs {
+    fn from(cli: CompressionArgs) -> Self {
+        Self {
+            level: cli.level,
+            workers: cli.workers,
+        }
+    }
+}
+
+impl From<ProcessArgs> for args::ProcessArgs {
+    fn from(cli: ProcessArgs) -> Self {
+        Self {
+            submissions: cli.submissions,
+            comments: cli.comments,
+            output: cli.output,
+            include_scores: cli.include_scores,
+            compression: cli.compression.into(),
+        }
+    }
+}
+
+impl From<FilterArgs> for args::FilterArgs {
+    fn from(cli: FilterArgs) -> Self {
+        Self {
+            input: cli.input,
+            output: cli.output,
+            split: cli.split,
+            name: cli.name,
+            compression: cli.compression.into(),
+        }
+    }
 }

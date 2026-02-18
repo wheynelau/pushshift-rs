@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use crate::cli::CompressionArgs;
+use crate::args::CompressionArgs;
 
 #[derive(Serialize, Deserialize)]
 pub struct JsonEntry {

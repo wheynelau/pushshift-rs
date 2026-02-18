@@ -1,0 +1,20 @@
+[package]
+name = "reddit-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ahash = { workspace = true }
+anyhow = { workspace = true }
+gjson = { workspace = true }
+indicatif = { workspace = true }
+petgraph = { workspace = true }
+rayon = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+zstd = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+simd-json = { workspace = true }

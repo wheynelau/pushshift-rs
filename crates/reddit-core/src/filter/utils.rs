@@ -7,7 +7,7 @@ use regex::Regex;
 use std::io::{BufRead, Write};
 use std::time::Duration;
 
-use crate::cli::FilterArgs;
+use crate::args::FilterArgs;
 use crate::common;
 
 type FileMap = AHashMap<String, Box<dyn Write>>;

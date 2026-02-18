@@ -1,0 +1,27 @@
+{
+  "productName": "reddit-rs",
+  "version": "0.3.0",
+  "identifier": "com.reddit-rs.gui",
+  "build": {
+    "frontendDist": "src/frontend"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "reddit-rs",
+        "width": 900,
+        "height": 700,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": []
+  }
+}

@@ -1,0 +1,101 @@
+name: GUI Release
+
+permissions:
+  contents: write
+
+# Same tag pattern as release.yml so both trigger together on a version tag.
+on:
+  push:
+    tags:
+      - '**[0-9]+.[0-9]+.[0-9]+*'
+
+jobs:
+  build-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            os-name: linux
+          - platform: windows-latest
+            os-name: windows
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Linux system dependencies
+        if: matrix.os-name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      # No tagName/releaseId means the action only builds — it does not create
+      # or modify any GitHub Release. We handle uploading ourselves below.
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: crates/reddit-gui
+
+      # Bundles land in target/release/bundle/ relative to the workspace root.
+      - name: Collect Linux artifacts
+        if: matrix.os-name == 'linux'
+        run: |
+          mkdir -p gui-artifacts
+          find target/release/bundle \( -name "*.AppImage" -o -name "*.deb" \) \
+            -exec cp {} gui-artifacts/ \;
+          ls gui-artifacts/
+
+      - name: Collect Windows artifacts
+        if: matrix.os-name == 'windows'
+        shell: bash
+        run: |
+          mkdir -p gui-artifacts
+          find target/release/bundle \( -name "*.msi" -o -name "*.exe" \) \
+            -exec cp {} gui-artifacts/ \;
+          ls gui-artifacts/
+
+      # Upload the built artifacts to the workflow run so they can be downloaded
+      # even when this is triggered from something other than a version tag.
+      - name: Upload artifacts to workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-${{ matrix.os-name }}
+          path: gui-artifacts/
+
+      # Wait for cargo-dist's Release workflow to create the GitHub Release,
+      # then attach the GUI installers to it.
+      - name: Attach to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          echo "Waiting for release '$TAG' to be published by cargo-dist..."
+          for i in $(seq 1 36); do
+            if gh release view "$TAG" --json tagName &>/dev/null; then
+              echo "Release found, uploading GUI artifacts..."
+              gh release upload "$TAG" gui-artifacts/* --clobber
+              echo "Done."
+              exit 0
+            fi
+            echo "Not ready yet, retrying in 10 s... ($i/36)"
+            sleep 10
+          done
+          echo "ERROR: Release '$TAG' was not created within 6 minutes."
+          exit 1

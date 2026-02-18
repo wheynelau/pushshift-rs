@@ -1,6 +1,6 @@
 use super::models::Reddit;
 use crate::{
-    cli::ProcessArgs,
+    args::ProcessArgs,
     graph::models::{Comment, Thread},
 };
 use indicatif::{ProgressBar, ProgressStyle};

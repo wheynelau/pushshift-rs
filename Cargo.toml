@@ -1,14 +1,16 @@
-[package]
-name = "reddit-rs"
-version = "0.2.2"
-edition = "2024"
-repository = "https://github.com/wheynelau/pushshift-rs"
+[workspace]
+members = ["crates/*"]
+resolver = "3"
 
-[dependencies]
+[workspace.package]
+version = "0.3.0"
+edition = "2024"
+
+[workspace.dependencies]
+reddit-core = { path = "crates/reddit-core" }
 ahash = "0.8.11"
 anyhow = "1.0.100"
 clap = { version = "4.5.56", features = ["derive"] }
-crossbeam-channel = "0.5.15"
 gjson = "0.8.1"
 indicatif = "0.18.3"
 petgraph = { version = "0.8.3", features = ["rayon"] }
@@ -17,8 +19,6 @@ regex = "1.12.2"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 zstd = { version = "0.13.3", features = ["zstdmt"] }
-
-[dev-dependencies]
 criterion = { version = "0.8.1", features = ["html_reports"] }
 simd-json = "0.17.0"
 

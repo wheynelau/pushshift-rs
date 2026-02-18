@@ -1,0 +1,14 @@
+[package]
+name = "reddit-cli"
+version.workspace = true
+edition.workspace = true
+repository = "https://github.com/wheynelau/pushshift-rs"
+
+[[bin]]
+name = "reddit-rs"
+path = "src/main.rs"
+
+[dependencies]
+reddit-core = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
