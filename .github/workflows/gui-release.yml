@@ -43,6 +43,42 @@ jobs:
             librsvg2-dev \
             patchelf
 
+      # Generate minimal placeholder icons using Python (stdlib only, no extra tools).
+      # Tauri's generate_context!() macro and tauri_build::build() both panic if
+      # the icon files listed in tauri.conf.json are missing.
+      - name: Generate icons
+        shell: bash
+        run: |
+          python3 - <<'PYEOF'
+          import os, struct, zlib, shutil
+          os.makedirs("crates/reddit-gui/icons", exist_ok=True)
+
+          def make_png(size, rgb=(255, 99, 20)):
+              def chunk(t, d):
+                  c = t + d
+                  return struct.pack('>I', len(d)) + c + struct.pack('>I', zlib.crc32(c) & 0xFFFFFFFF)
+              ihdr = chunk(b'IHDR', struct.pack('>IIBBBBB', size, size, 8, 2, 0, 0, 0))
+              row = b'\x00' + bytes(rgb) * size
+              idat = chunk(b'IDAT', zlib.compress(row * size, 9))
+              return b'\x89PNG\r\n\x1a\n' + ihdr + idat + chunk(b'IEND', b'')
+
+          def make_ico():
+              p32, p256 = make_png(32), make_png(256)
+              hdr = struct.pack('<HHH', 0, 1, 2)
+              off = 6 + 16 * 2
+              e1 = struct.pack('<BBBBHHII', 32,  32,  0, 0, 1, 32, len(p32),  off)
+              e2 = struct.pack('<BBBBHHII',  0,   0,  0, 0, 1, 32, len(p256), off + len(p32))
+              return hdr + e1 + e2 + p32 + p256
+
+          for s in [32, 128, 512]:
+              with open(f"crates/reddit-gui/icons/{s}x{s}.png", 'wb') as f:
+                  f.write(make_png(s))
+          shutil.copy("crates/reddit-gui/icons/512x512.png", "crates/reddit-gui/icons/icon.png")
+          with open("crates/reddit-gui/icons/icon.ico", 'wb') as f:
+              f.write(make_ico())
+          print("Icons generated.")
+          PYEOF
+
       # No tagName/releaseId means the action only builds — it does not create
       # or modify any GitHub Release. We handle uploading ourselves below.
       - name: Build Tauri app
