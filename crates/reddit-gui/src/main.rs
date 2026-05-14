@@ -13,7 +13,10 @@ struct GuiCompressionArgs {
 
 impl From<GuiCompressionArgs> for CompressionArgs {
     fn from(g: GuiCompressionArgs) -> Self {
-        CompressionArgs { level: g.level, workers: g.workers }
+        CompressionArgs {
+            level: g.level,
+            workers: g.workers,
+        }
     }
 }
 

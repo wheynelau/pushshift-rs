@@ -3,3 +3,8 @@
 /benches
 *.jsonl
 *.zst
+generate-data
+processed
+.env
+.serena/
+test.sh
